@@ -1,0 +1,61 @@
+1. Requesitos: Placa ESP32 compatível
+Pode ser qualquer modelo com BLE, como:
+
+ESP32-WROOM-32
+ESP32-WROVER
+ESP32-S3
+
+
+2. Instalar o ESP-IDF (ambiente de desenvolvimento)
+Você precisa instalar o SDK oficial da Espressif.
+Para isso:
+
+👉 Linux/macOS:
+git clone --recursive https://github.com/espressif/esp-idf.git
+cd esp-idf
+./install.sh
+. ./export.sh
+👉 Windows:
+Baixe o ESP-IDF Tools Installer:
+
+Link: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/windows.html
+
+3. Python (>=3.7) com as ferramentas:
+Durante a instalação, o install.sh já configura:
+
+idf.py → o comando principal para compilar/flashar.
+
+esptool.py → grava firmware na placa.
+
+Toolchain para compilação C (ex: xtensa-esp32-elf-gcc).
+
+4. USB Driver para sua placa
+Geralmente usa o chip CP210x ou CH340.
+
+No Linux, funciona nativamente.
+
+No Windows, você pode baixar em:
+
+Silicon Labs CP210x drivers
+
+CH340/341 driver
+
+5. Conectar a placa ESP32 via USB
+Conecte seu ESP32 ao PC com um cabo USB e descubra a porta serial:
+
+Linux/macOS:
+ls /dev/ttyUSB*
+Windows:
+Ver em Gerenciador de Dispositivos > Portas (COM e LPT)
+
+6. Criar um novo projeto com ESP-IDF
+idf.py create-project fake_ble
+cd fake_ble
+Substitua o arquivo main/main.c pelo código que te enviei.
+
+7. Compilar e enviar para a placa
+Rode:
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
+(⚠️ Substitua /dev/ttyUSB0 pela sua porta)
+
