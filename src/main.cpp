@@ -215,7 +215,7 @@ void generateRandomMac(uint8_t *mac)
 void showMenu()
 {
 
-  Serial.println("\nPhantomFreq – Spoofing de Sinais com ESP32 para Frequencímetros Industriais\n");
+  Serial.println("\nPhantomFreq – Spoofing de Sinais para Frequencímetros Industriais\n");
   Serial.println("\n--------------------MENU---------------------");
   Serial.println("1 - Modo Automático com lista pré-definida");
   Serial.println("2 - Modo Automático com MAC randômico");
@@ -229,7 +229,7 @@ void showMenu()
   Serial.println("10 - Reiniciar dispositivo");
   Serial.println("----------------------------------------------");
   Serial.printf("MACs ativos: %d/99\n", macCount);
-  Serial.printf("Intervalo restart: %lu ms\n", restartInterval);
+  Serial.printf("Intervalo de restart: %lu ms\n", restartInterval);
   Serial.print("\nEscolha uma opção: ");
 }
 
