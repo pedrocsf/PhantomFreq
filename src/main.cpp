@@ -9,30 +9,26 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
-// --- CONFIGS ---
-#define EEPROM_SIZE 64 // Aumentado para acomodar todas as configurações
+#define EEPROM_SIZE 64
 #define EEPROM_ADDR 0
 #define EEPROM_BPM_ADDR 1
 #define EEPROM_DIR_ADDR 2
 #define EEPROM_MODE_ADDR 3
 #define EEPROM_SELECTED_MAC_ADDR 4
 #define EEPROM_USE_CUSTOM_MAC_ADDR 5
-#define EEPROM_CUSTOM_MAC_ADDR 6        // 6 bytes (6-11)
-#define EEPROM_MAC_COUNT_ADDR 12        // Novo endereço para macCount
-#define EEPROM_RESTART_INTERVAL_ADDR 16 // 4 bytes para unsigned long (16-19)
+#define EEPROM_CUSTOM_MAC_ADDR 6
+#define EEPROM_MAC_COUNT_ADDR 12
+#define EEPROM_RESTART_INTERVAL_ADDR 16
 
 #define DEVICE_NAME "HW706-0047980"
-
-// Variáveis de controle
 bool autoRestart = true;
 bool staticMode = false;
 int selectedMacIndex = 0;
-unsigned long restartInterval = 250; // Tempo em ms para reinicializações
+unsigned long restartInterval = 250;
 
 unsigned long lastMenuCheck = 0;
 const unsigned long MENU_CHECK_INTERVAL = 100;
 
-// Variáveis para controle de tempo de boot
 unsigned long bootStartTime = 0;
 unsigned long bootCompleteTime = 0;
 bool bootTimeRecorded = false;
@@ -42,14 +38,12 @@ uint8_t getNextBPM()
   uint8_t bpm = EEPROM.read(EEPROM_BPM_ADDR);
   uint8_t dir = EEPROM.read(EEPROM_DIR_ADDR);
 
-  // Inicialização de segurança
   if (bpm < 60 || bpm > 180)
     bpm = 60;
   if (dir > 1)
     dir = 0;
 
-  // Atualiza BPM
-  if (dir == 0) // Subindo
+  if (dir == 0)
   {
     bpm++;
     if (bpm >= 180)
@@ -58,7 +52,7 @@ uint8_t getNextBPM()
       dir = 1;
     }
   }
-  else // Descendo
+  else
   {
     bpm--;
     if (bpm <= 60)
@@ -68,7 +62,6 @@ uint8_t getNextBPM()
     }
   }
 
-  // Grava valores atualizados
   EEPROM.write(EEPROM_BPM_ADDR, bpm);
   EEPROM.write(EEPROM_DIR_ADDR, dir);
   EEPROM.commit();
@@ -76,8 +69,7 @@ uint8_t getNextBPM()
   return bpm;
 }
 
-// --- LISTA DE MACs UNICAST VÁLIDOS ---
-int macCount = 99; // Mudança de const para variável modificável
+int macCount = 99;
 uint8_t mac_list[99][6] = {
     {0xC2, 0x52, 0xF5, 0xC7, 0xD6, 0xFE},
     {0xD2, 0x4F, 0x3A, 0x77, 0x22, 0x10},
@@ -179,12 +171,10 @@ uint8_t mac_list[99][6] = {
     {0xD6, 0x55, 0x56, 0x57, 0x58, 0x58},
     {0xE6, 0x59, 0x5A, 0x5B, 0x5C, 0x5C}};
 
-// --- Função para pegar o próximo MAC index da EEPROM ---
 int getNextMacIndex()
 {
   int idx = EEPROM.read(EEPROM_ADDR);
 
-  // Validação adicional
   if (idx >= macCount)
   {
     idx = 0;
@@ -198,50 +188,34 @@ int getNextMacIndex()
   return idx;
 }
 
-// Adicione estas variáveis após as outras variáveis de controle
 uint8_t customMac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 bool useCustomMac = false;
 bool useRandomMac = false;
 
-// --- Função para gerar MAC aleatório válido ---
 void generateRandomMac(uint8_t *mac)
 {
-  // Primeiro byte: deve ser par para unicast e ter bit 1 setado para locally administered
-  // Formato: xxxx xx10 (bits 0 e 1: 10 = locally administered unicast)
-  mac[0] = (random(0, 64) << 2) | 0x02; // Garante que seja locally administered unicast
+  mac[0] = (random(0, 64) << 2) | 0x02;
 
-  // Evita alguns padrões problemáticos no primeiro byte
   while (mac[0] == 0x00 || mac[0] == 0xFF || (mac[0] & 0x01) == 1)
   {
     mac[0] = (random(0, 64) << 2) | 0x02;
   }
 
-  // Outros 5 bytes podem ser qualquer valor válido
   for (int i = 1; i < 6; i++)
   {
     mac[i] = random(0, 256);
-    // Evita valores problemáticos
     while (mac[i] == 0xFF && i < 5)
-    { // Evita broadcast parcial
+    {
       mac[i] = random(0, 256);
     }
   }
 }
 
-// --- Função para exibir menu ---
 void showMenu()
 {
-  Serial.println(u8R"rawliteral(
-8888ba.88ba   .88888.   .88888.  dP     dP d8888888P 
-88  `8b  `8b d8'   `8b d8'   `8b 88     88      .d8' 
-88   88   88 88     88 88     88 88    .8P    .d8'   
-88   88   88 88     88 88     88 88    d8'  .d8'     
-88   88   88 Y8.   .8P Y8.   .8P 88  .d8P  d8'       
-dP   dP   dP  `8888P'   `8888P'  888888'   Y8888888P 
-                             )rawliteral");
-  Serial.println("\n===========EMULADOR DE BANDS===========\n");
-  Serial.println("'Criado para manter a sanidade dos devs'\n");
+
+  Serial.println("\nPhantomFreq – Spoofing de Sinais com ESP32 para Frequencímetros Industriais\n");
   Serial.println("\n--------------------MENU---------------------");
   Serial.println("1 - Modo Automático com lista pré-definida");
   Serial.println("2 - Modo Automático com MAC randômico");
@@ -259,22 +233,18 @@ dP   dP   dP  `8888P'   `8888P'  888888'   Y8888888P
   Serial.print("\nEscolha uma opção: ");
 }
 
-// --- Função para validar e converter MAC ---
 bool parseCustomMac(String macStr, uint8_t *macArray)
 {
   macStr.trim();
   macStr.toUpperCase();
 
-  // Remove espaços
   macStr.replace(" ", "");
 
-  // Verifica formato básico
   if (macStr.length() != 17)
   {
     return false;
   }
 
-  // Verifica separadores
   if (macStr.charAt(2) != ':' || macStr.charAt(5) != ':' ||
       macStr.charAt(8) != ':' || macStr.charAt(11) != ':' ||
       macStr.charAt(14) != ':')
@@ -282,12 +252,10 @@ bool parseCustomMac(String macStr, uint8_t *macArray)
     return false;
   }
 
-  // Converte cada byte
   for (int i = 0; i < 6; i++)
   {
     String byteStr = macStr.substring(i * 3, i * 3 + 2);
 
-    // Verifica se são caracteres hexadecimais válidos
     for (int j = 0; j < 2; j++)
     {
       char c = byteStr.charAt(j);
@@ -297,14 +265,12 @@ bool parseCustomMac(String macStr, uint8_t *macArray)
       }
     }
 
-    // Converte string hexadecimal para byte
     macArray[i] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
   }
 
   return true;
 }
 
-// --- Função para listar MACs ---
 void listMacs()
 {
   Serial.println("\n=== LISTA DE MACs DISPONÍVEIS ===");
@@ -317,12 +283,10 @@ void listMacs()
   Serial.println("===============================");
 }
 
-// --- Função para mostrar status ---
 void showStatus()
 {
   Serial.println("\n=== STATUS ATUAL ===");
 
-  // Mostra tempo de boot se disponível
   if (bootTimeRecorded)
   {
     unsigned long totalBootTime = bootCompleteTime - bootStartTime;
@@ -370,14 +334,12 @@ void showStatus()
                   mac_list[selectedMacIndex][3], mac_list[selectedMacIndex][4], mac_list[selectedMacIndex][5]);
   }
 
-  // Mostra uptime atual
   unsigned long uptime = millis();
   Serial.printf("Tempo ativo: %lu ms (%.2f segundos)\n", uptime, uptime / 1000.0);
 
   Serial.println("==================");
 }
 
-// --- Função para processar comandos do menu ---
 void processMenuCommand()
 {
   if (Serial.available())
@@ -406,7 +368,7 @@ void processMenuCommand()
       staticMode = false;
       useCustomMac = false;
       useRandomMac = true;
-      EEPROM.write(EEPROM_MODE_ADDR, 2); // Novo valor para modo randômico
+      EEPROM.write(EEPROM_MODE_ADDR, 2);
       EEPROM.write(EEPROM_USE_CUSTOM_MAC_ADDR, 0);
       EEPROM.commit();
       Serial.println("Modo automático com MAC randômico ativado! Reiniciando...");
@@ -440,10 +402,9 @@ void processMenuCommand()
         useCustomMac = false;
         useRandomMac = false;
 
-        // Salva configurações na EEPROM
         EEPROM.write(EEPROM_SELECTED_MAC_ADDR, selectedMacIndex);
         EEPROM.write(EEPROM_USE_CUSTOM_MAC_ADDR, 0);
-        EEPROM.write(EEPROM_MODE_ADDR, 1); // Força modo estático
+        EEPROM.write(EEPROM_MODE_ADDR, 1);
         EEPROM.commit();
 
         Serial.printf("MAC %d selecionado: %02X:%02X:%02X:%02X:%02X:%02X\n", macIndex,
@@ -478,10 +439,8 @@ void processMenuCommand()
         autoRestart = false;
         useRandomMac = false;
 
-        // Salva configurações na EEPROM
         EEPROM.write(EEPROM_MODE_ADDR, 1);
         EEPROM.write(EEPROM_USE_CUSTOM_MAC_ADDR, 1);
-        // Salva MAC customizado na EEPROM
         for (int i = 0; i < 6; i++)
         {
           EEPROM.write(EEPROM_CUSTOM_MAC_ADDR + i, customMac[i]);
@@ -529,14 +488,12 @@ void processMenuCommand()
       if (newCount >= 1 && newCount <= 99)
       {
         macCount = newCount;
-        // Salva na EEPROM no endereço correto
         EEPROM.write(EEPROM_MAC_COUNT_ADDR, macCount);
         EEPROM.commit();
 
         Serial.printf("Quantidade de MACs definida para: %d\n", macCount);
         Serial.println("Agora o sistema usará apenas os primeiros " + String(macCount) + " MACs da lista.");
 
-        // Se o MAC selecionado atual está fora do novo range, resetar para 0
         if (selectedMacIndex >= macCount)
         {
           selectedMacIndex = 0;
@@ -568,7 +525,6 @@ void processMenuCommand()
       if (newInterval >= 1 && newInterval <= 30000)
       {
         restartInterval = newInterval;
-        // Salva na EEPROM usando put para unsigned long
         EEPROM.put(EEPROM_RESTART_INTERVAL_ADDR, restartInterval);
         EEPROM.commit();
         Serial.printf("Intervalo de restart definido para: %lu ms\n", restartInterval);
@@ -596,7 +552,6 @@ void processMenuCommand()
   }
 }
 
-// --- Callbacks BLE (opcional) ---
 class MyServerCallbacks : public BLEServerCallbacks
 {
   void onConnect(BLEServer *pServer)
@@ -611,7 +566,6 @@ class MyServerCallbacks : public BLEServerCallbacks
 
 void setup()
 {
-  // Marca o início do processo de boot
   bootStartTime = millis();
 
   Serial.begin(115200);
@@ -622,12 +576,10 @@ void setup()
 
   EEPROM.begin(EEPROM_SIZE);
 
-  // Carrega configurações da EEPROM
   uint8_t mode = EEPROM.read(EEPROM_MODE_ADDR);
   uint8_t storedMacIndex = EEPROM.read(EEPROM_SELECTED_MAC_ADDR);
   uint8_t storedUseCustom = EEPROM.read(EEPROM_USE_CUSTOM_MAC_ADDR);
 
-  // Carrega quantidade de MACs da EEPROM
   uint8_t storedMacCount = EEPROM.read(EEPROM_MAC_COUNT_ADDR);
   if (storedMacCount >= 1 && storedMacCount <= 99)
   {
@@ -636,12 +588,10 @@ void setup()
   }
   else
   {
-    // Se não há valor válido, salva o padrão
     EEPROM.write(EEPROM_MAC_COUNT_ADDR, macCount);
     EEPROM.commit();
   }
 
-  // Carrega intervalo de restart da EEPROM
   unsigned long storedInterval;
   EEPROM.get(EEPROM_RESTART_INTERVAL_ADDR, storedInterval);
   if (storedInterval >= 250 && storedInterval <= 30000)
@@ -651,38 +601,32 @@ void setup()
   }
   else
   {
-    // Se não há valor válido, salva o padrão
     EEPROM.put(EEPROM_RESTART_INTERVAL_ADDR, restartInterval);
     EEPROM.commit();
   }
 
-  // Se não há valor válido na EEPROM, define modo padrão
   if (mode > 2)
   {
-    mode = 1; // Modo estático por padrão para mostrar o menu
+    mode = 1;
     EEPROM.write(EEPROM_MODE_ADDR, mode);
     EEPROM.commit();
   }
 
-  // Carrega índice do MAC selecionado - CORRIGIDO
   if (storedMacIndex < macCount)
   {
     selectedMacIndex = storedMacIndex;
   }
   else
   {
-    // Se índice inválido, resetar para 0
     selectedMacIndex = 0;
     EEPROM.write(EEPROM_SELECTED_MAC_ADDR, selectedMacIndex);
     EEPROM.commit();
     Serial.println("MAC index resetado para 0 (valor inválido na EEPROM)");
   }
 
-  // Carrega configuração de MAC customizado
   if (storedUseCustom == 1)
   {
     useCustomMac = true;
-    // Carrega MAC customizado da EEPROM
     for (int i = 0; i < 6; i++)
     {
       customMac[i] = EEPROM.read(EEPROM_CUSTOM_MAC_ADDR + i);
@@ -706,7 +650,7 @@ void setup()
     Serial.println("=== INICIANDO EM MODO AUTOMÁTICO RANDÔMICO ===");
     Serial.println(">>> Digite 'M' ou '2' a qualquer momento para voltar ao menu <<<");
   }
-  else // mode == 0
+  else
   {
     autoRestart = true;
     staticMode = false;
@@ -717,7 +661,6 @@ void setup()
   }
 
   Serial.println("--- Selecionando MAC ---");
-  // --- Seleciona MAC ---
   uint8_t macToUse[6];
   if (staticMode && useCustomMac)
   {
@@ -746,7 +689,6 @@ void setup()
   esp_base_mac_addr_set(macToUse);
 
   Serial.println("--- Inicializando BLE ---");
-  // --- Inicia BLE ---
   BLEDevice::init(DEVICE_NAME);
 
   const uint8_t *realMac = esp_bt_dev_get_address();
@@ -759,7 +701,6 @@ void setup()
   pServer->setCallbacks(new MyServerCallbacks());
 
   Serial.println("--- Criando serviços BLE ---");
-  // --- Serviços (UUIDs) ---
   BLEService *heartRateService = pServer->createService(BLEUUID((uint16_t)0x180D));
   BLEService *userDataService = pServer->createService(BLEUUID((uint16_t)0x181C));
   BLEService *batteryService = pServer->createService(BLEUUID((uint16_t)0x180F));
@@ -773,13 +714,11 @@ void setup()
   customService->start();
 
   Serial.println("--- Configurando advertising ---");
-  // --- Advertising ---
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   BLEAdvertisementData advData;
 
   advData.setFlags(0x06);
 
-  // UUIDs no advertising
   uint8_t uuidData[] = {
       0x0B, 0x03,
       0x0D, 0x18,
@@ -789,7 +728,6 @@ void setup()
       0x00, 0xFD};
   advData.addData(std::string((const char *)uuidData, sizeof(uuidData)));
 
-  // Manufacturer data (opcional)
   uint8_t bpm = getNextBPM();
   uint8_t batteryLevels[] = {0, 25, 50, 75, 100};
   int index = random(0, 5);
@@ -797,23 +735,20 @@ void setup()
   uint8_t mfrData[] = {0x07, 0xFF, 0x05, 0xFF, 0x01, battery, 0x06, bpm};
   advData.addData(std::string((const char *)mfrData, sizeof(mfrData)));
 
-  // Nome do dispositivo
   const char *nome = DEVICE_NAME;
   size_t nomeLength = strlen(nome);
   uint8_t nomeData[2 + nomeLength];
   nomeData[0] = 1 + nomeLength;
-  nomeData[1] = 0x09; // Complete Local Name
+  nomeData[1] = 0x09;
   memcpy(&nomeData[2], nome, nomeLength);
   advData.addData(std::string((const char *)nomeData, sizeof(nomeData)));
 
   Serial.println("--- Iniciando advertising ---");
-  // Inicia advertising
   pAdvertising->setAdvertisementData(advData);
   pAdvertising->start();
 
-  // Marca o fim do processo de boot e calcula o tempo total
   bootCompleteTime = millis();
-  unsigned long totalBootTime = (bootCompleteTime - bootStartTime)/10;
+  unsigned long totalBootTime = (bootCompleteTime - bootStartTime) / 10;
   bootTimeRecorded = true;
 
   Serial.println("\n╔════════════════════════════════════════╗");
@@ -842,7 +777,6 @@ bool checkForMenuRequest()
   if (Serial.available())
   {
     char input = Serial.read();
-    // Limpa o buffer
     while (Serial.available())
     {
       Serial.read();
@@ -867,13 +801,11 @@ void loop()
 {
   if (staticMode)
   {
-    // Modo estático - processa comandos do menu
     processMenuCommand();
     delay(100);
   }
   else
   {
-    // Modo automático - mas verifica por comandos de menu periodicamente
     unsigned long currentTime = millis();
 
     if (currentTime - lastMenuCheck >= MENU_CHECK_INTERVAL)
@@ -885,14 +817,12 @@ void loop()
       lastMenuCheck = currentTime;
     }
 
-    // Mostra countdown para o próximo restart
     unsigned long timeUntilRestart = restartInterval - (currentTime % restartInterval);
-    if (timeUntilRestart <= 1000 && timeUntilRestart > 900) // Mostra apenas quando faltam ~1 segundo
+    if (timeUntilRestart <= 1000 && timeUntilRestart > 900)
     {
       Serial.printf("Reiniciando em %lu ms...\n", timeUntilRestart);
     }
 
-    // Reinicia com o intervalo configurável
     vTaskDelay(pdMS_TO_TICKS(restartInterval));
     Serial.println("\n=== INICIANDO RESTART ===");
     esp_restart();
